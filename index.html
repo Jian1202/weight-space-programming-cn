@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<script src="vendor/template.v2.js"></script>
+<title>权重空间编程的火花：大语言模型能够直接读写神经网络权重</title>
+<meta content="我们发现，前沿大语言模型直接读写神经网络权重的能力出人意料地强，远超我们对人类或传统算法的预期。" name="description"/>
+<meta content="article" property="og:type"/>
+<meta content="权重空间编程的火花：大语言模型能够直接读写神经网络权重" property="og:title"/>
+<meta content="我们发现，前沿大语言模型直接读写神经网络权重的能力出人意料地强，远超我们对人类或传统算法的预期。" property="og:description"/>
+<meta content="https://rikiyat.github.io/blog/weight-space-programming/" property="og:url"/>
+<meta content="assets/preview.png" property="og:image"/>
+<link href="https://rikiyat.github.io/blog/weight-space-programming/" rel="canonical"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<link href="vendor/fonts/fonts.css" rel="stylesheet"/>
+<script>
+        window.MathJax = {
+            loader: {load: ['[tex]/color']},
+            tex: {packages: {'[+]': ['color']}},
+            svg: {fontCache: 'local'}
+        };
+    </script>
+<script async="" id="MathJax-script" src="vendor/mathjax/es5/tex-mml-svg.js"></script>
+<link href="css/style.css" rel="stylesheet"/>
+<style>
+        d-title h1 .title-kicker {
+            display: block;
+            margin: 0 0 6px;
+            font-size: 26px;
+            font-weight: 300;
+            line-height: 1.4;
+            letter-spacing: normal;
+            color: #555555;
+        }
+    </style>
+<script src="js/traces.js"></script>
+<script src="js/mathedit.js"></script>
+<script src="js/teaser.js"></script>
+<script src="js/handplay.js"></script>
+<script src="js/gohand.js"></script>
+<script>
+        window.addEventListener("load", () => {
+            document.querySelectorAll("video[autoplay]").forEach((v) => v.play().catch(() => {}));
+        });
+    </script>
+<script>
+        document.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll('figure img[src$=".svg"]').forEach((img) => {
+                fetch(img.src)
+                    .then((r) => (r.ok ? r.text() : Promise.reject(r.status)))
+                    .then((text) => {
+                        const svg = new DOMParser().parseFromString(text, "image/svg+xml").documentElement;
+                        if (svg.localName !== "svg" || svg.querySelector("parsererror")) return;
+                        svg.classList.add("figure-svg");
+                        if (img.alt) svg.setAttribute("aria-label", img.alt);
+                        img.replaceWith(document.importNode(svg, true));
+                    })
+                    .catch(() => {});
+            });
+        });
+    </script>
+<script src="js/cites.js"></script>
+<style>
+.masthead {
+  position: relative;
+  z-index: 20;
+  border-bottom: 1px solid #f2f3f3;
+  background: #fff;
+  font-family: -apple-system, ".SFNSText-Regular", "San Francisco", "Roboto", "Segoe UI", "Helvetica Neue", "Lucida Grande", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: auto;  /* the post's own CSS sets antialiased, the theme does not */
+}
+@media (min-width: 768px) {
+  .masthead { font-size: 18px; }
+}
+.masthead__inner-wrap {
+  box-sizing: border-box;
+  max-width: 925px;
+  margin: 0 auto;
+  padding: 1em;
+}
+@media (min-width: 1280px) {
+  .masthead__inner-wrap { max-width: 1280px; }
+}
+.masthead__menu {
+  display: flex;
+  align-items: center;
+}
+.masthead__menu #site-nav {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.masthead ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.greedy-nav button,
+.greedy-nav .hidden-links {
+  display: none;
+}
+.greedy-nav .visible-links {
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.greedy-nav .visible-links::-webkit-scrollbar {
+  display: none;
+}
+.masthead__menu-item {
+  flex: none;
+  margin: 0;
+  white-space: nowrap;
+}
+.masthead__menu-item--lg {
+  padding-right: 2em;
+  font-weight: 700;
+}
+.greedy-nav a {
+  position: relative;
+  display: block;
+  margin: 0 1em;
+  padding: 0.5em 0;
+  border: none;
+  color: #7a8288;
+  text-decoration: none;
+}
+.greedy-nav a:hover {
+  color: #5c6266;
+}
+.masthead__menu-item:first-child a {
+  margin-left: 0;
+}
+.masthead__menu-item:last-child a {
+  margin-right: 0;
+}
+.greedy-nav a::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 4px;
+  background: #bdc1c4;
+  transform: scaleX(0);
+  transition: all 0.2s ease-in-out;
+}
+.greedy-nav a:hover::before {
+  transform: scaleX(1);
+}
+.masthead__menu-item a[href$="/blog/"] {
+  color: #598BE7;
+}
+.masthead__lang {
+  position: relative;
+  flex: none;
+  margin-left: 1em;
+}
+.masthead__lang summary {
+  display: block;
+  padding: 0.5em 0;
+  color: #7a8288;
+  list-style: none;
+  cursor: pointer;
+}
+.masthead__lang summary::-webkit-details-marker {
+  display: none;
+}
+.masthead__lang summary:hover {
+  color: #5c6266;
+}
+.masthead__lang summary svg {
+  display: block;
+}
+.masthead__lang .masthead__lang-menu {
+  position: absolute;
+  top: 100%;
+  right: -11px;
+  margin-top: 15px;
+  padding: 5px;
+  border: 1px solid #f2f3f3;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.25);
+}
+.masthead__lang .masthead__lang-menu::before,
+.masthead__lang .masthead__lang-menu::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  width: 0;
+  border-style: solid;
+  border-width: 0 10px 10px;
+}
+.masthead__lang .masthead__lang-menu::before {
+  top: -11px;
+  border-color: #f2f3f3 transparent;
+}
+.masthead__lang .masthead__lang-menu::after {
+  top: -10px;
+  border-color: #fff transparent;
+}
+.masthead__lang .masthead__lang-menu li {
+  margin: 0;
+}
+.masthead__lang .masthead__lang-menu a {
+  display: block;
+  padding: 10px 20px;
+  border: none;
+  color: #7a8288;
+  font-size: 1em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.masthead__lang .masthead__lang-menu a:hover {
+  color: #5c6266;
+  background: #dee0e1;
+}
+</style><style>
+.post-cite p {
+  margin: 8px 0 6px;
+}
+.post-cite__box {
+  position: relative;
+  margin: 0 0 14px;
+}
+.post-cite__box pre {
+  margin: 0;
+  padding: 10px 64px 10px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  background: #f7f8fa;
+  color: #222222;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;        /* long lines wrap on screen; a copy keeps them whole */
+  overflow-wrap: anywhere;
+}
+.post-cite__box--text pre {
+  font-family: inherit;
+  font-size: 13.5px;
+}
+.post-cite__box button {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  padding: 2px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  background: #fff;
+  color: #555555;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.post-cite__box button:hover {          /* the post's link color, if it has one */
+  border-color: var(--green, #598BE7);
+  color: var(--green, #598BE7);
+}
+</style><style>body, d-article, d-title, button {font-family:"Source Sans 3","Microsoft YaHei","PingFang SC",sans-serif;} d-article p {line-height:1.85;} d-title h1 {text-wrap:balance;} .tp-text,.tp-reply,.me-said {overflow-wrap:anywhere;} .post-cite__box pre {text-wrap:wrap;} @media(max-width:600px){d-title h1{font-size:34px;line-height:1.3;} d-title h1 .title-kicker{font-size:21px;} .masthead__inner-wrap{padding:12px;} .masthead__menu-item--lg{padding-right:8px;}}</style><style>.masthead-original{flex:0 0 auto;margin-left:14px;padding-left:10px;background:#fff;position:relative;z-index:1;} .masthead .greedy-nav{overflow:hidden;} .masthead .visible-links{max-width:100%;}</style></head>
+<body><div class="masthead"><div class="masthead__inner-wrap"><div class="masthead__menu"><nav aria-label="主导航" class="greedy-nav" id="site-nav"><ul class="visible-links"><li class="masthead__menu-item masthead__menu-item--lg"><a href="https://rikiyat.github.io/">Rikiya Takehi</a></li><li class="masthead__menu-item"><a href="https://rikiyat.github.io/#news">动态</a></li><li class="masthead__menu-item"><a href="https://rikiyat.github.io/#publications">论文</a></li><li class="masthead__menu-item"><a href="https://rikiyat.github.io/blog/">博客</a></li><li class="masthead__menu-item"><a href="https://rikiyat.github.io/#experience">经历</a></li><li class="masthead__menu-item"><a href="https://drive.google.com/file/d/1W0TgFv75leCCIz2nn0Rt30YXzXxE9Dkf/view?usp=sharing">简历</a></li></ul></nav><a class="masthead-original" href="https://rikiyat.github.io/blog/weight-space-programming/" style="white-space:nowrap;color:#7a8288;font-size:14px">英文原文 ↗</a></div></div></div>
+<d-front-matter>
+<script type="text/json">{"title": "权重空间编程的火花：大语言模型能够直接读写神经网络权重", "description": "前沿大语言模型能够直接读写神经网络权重。", "authors": [{"author": "Rikiya Takehi", "authorURL": "https://rikiyat.github.io", "affiliations": [{"name": "MIT CSAIL"}]}, {"author": "Jayden Teoh", "authorURL": "https://jaydenteoh.github.io/", "affiliations": [{"name": "MIT CSAIL"}]}, {"author": "Alex Zhang", "authorURL": "https://alexzhang13.github.io/", "affiliations": [{"name": "MIT CSAIL"}]}, {"author": "Omar Khattab", "authorURL": "https://omarkhattab.com/", "affiliations": [{"name": "MIT CSAIL"}]}]}</script>
+</d-front-matter>
+<d-title>
+<h1><span class="title-kicker">权重空间编程的火花：</span>大语言模型能够<span style="white-space:nowrap">直接读写</span><span style="white-space:nowrap">神经网络权重</span></h1>
+</d-title>
+<div class="base-grid post-byline">
+<div class="byline-grid">
+<div>
+<h3>作者</h3>
+<p><a href="https://rikiyat.github.io">Rikiya Takehi</a>*</p>
+<p><a href="https://jaydenteoh.github.io/">Jayden Teoh</a>*</p>
+<p><a href="https://alexzhang13.github.io/">Alex Zhang</a></p>
+<p><a href="https://omarkhattab.com/">Omar Khattab</a> </p>
+</div>
+<div>
+<h3>所属机构</h3>
+<p>麻省理工学院 CSAIL</p>
+<p>麻省理工学院 CSAIL</p>
+<p>麻省理工学院 CSAIL</p>
+<p>麻省理工学院 CSAIL</p>
+</div>
+<div>
+<h3>发布日期</h3>
+<p>2026年11月2日</p>
+</div>
+</div>
+</div>
+<d-article>
+<div class="tldr">
+<b>内容提要</b>
+<p>我们发现，前沿大语言模型在 <b>直接读写神经网络权重</b>方面的表现好得出人意料，远超我们对人类或传统算法的预期。这可能对优化和可解释性都具有重大意义。</p>
+<p>仅凭观察原始权重，GPT-6 Astra 就 <b>能判断一个网络被训练来完成什么任务</b>。而且，在没有任何环境反馈的情况下，它 <b>也能轻松地从零编写小型游戏网络</b> ，表现超过使用 PPO 训练一亿步的网络。</p>
+<p>同样，当我们要求 Astra 在不使用梯度的情况下提升 Qwen3.5-0.8B 的数学能力时，它 <b>找出了权重中的一个问题</b> ，这个问题会导致 Qwen 自己的 <a href="https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/main/README.md#L856">模型说明卡</a> 中也提醒过的推理循环，并且它 <b>通过直接编辑 0.016% 的权重修复了这个问题</b>。在相同采样设置下，这次权重修正将 MATH-500 得分从 7.9% 提高到 48.1%，还无需额外调整就泛化到了指令遵循任务，使 IFEval 得分提高至约三倍。</p>
+<p>实现这一切，并不需要允许 Astra 编写训练循环。它通过推理，判断神经网络的各个部分在计算什么、或者应该计算什么，然后据此修改权重。我们将其称为 <b>权重空间编程</b>。</p>
+<p>纵观深度学习的发展历程，我们一直将简单的归纳偏置编码进 Adam、Muon 这类小型符号优化器中。这一点正在改变： <b>我们的神经网络权重很快将由 <i>直接</i> 对权重进行有目的推理的大语言模型来优化</b>。</p>
+</div>
+<figure class="l-page teaser-fig">
+<div class="teaser">
+<div class="tz-panel">
+<div class="tz-step">读取</div>
+<div class="tz-task">这个神经网络是在哪款游戏上训练的？</div>
+<div class="tz-vis tz-wall" data-item="Breakout" data-src="assets/traces/exp1_games.json"></div>
+<div class="tz-astra">Astra 读取 17,253 个权重，不使用工具</div>
+<div class="tz-out"><img alt="网络玩打砖块。" class="tz-gif" src="assets/which_game/breakout.gif"/><span class="tz-big">打砖块</span> <span class="tz-note">置信度 99%</span></div>
+</div>
+<div class="tz-panel">
+<div class="tz-step">修复</div>
+<div class="tz-task">训练好的策略始终无法让汽车越过条带。</div>
+<div class="tz-vis tz-car"><img alt="汽车关卡：Astra 编辑后汽车先后退，再跳过红色条带到达蓝色方框；淡色显示的 PPO 汽车仍困在坡道上。" src="assets/carjump_scene.svg"/></div>
+<div class="tz-astra">Astra 一次修改 3.5% 的权重</div>
+<div class="tz-out"><span class="tz-big">100%</span> <span class="tz-note">成功率，原为 0%</span></div>
+</div>
+<div class="tz-panel">
+<div class="tz-step">改进</div>
+<div class="tz-task">提高 Qwen3.5-0.8B 的数学能力。</div>
+<div class="tz-vis tz-bars" data-from="7.9" data-max="62" data-to="48.1">
+<div class="tz-col"><div class="tz-bar tz-bar-before" style="height: 12.7%"><span class="tz-v">7.9%</span></div><div class="tz-bl">基础模型</div></div>
+<div class="tz-col"><div class="tz-bar tz-bar-after" style="height: 12.7%"><span class="tz-v">7.9%</span></div><div class="tz-bl">Astra 编辑后</div></div>
+</div>
+<div class="tz-astra">Astra 在 Python 内核中编辑权重，不进行训练</div>
+<div class="tz-out"><span class="tz-big">48.1%</span> <span class="tz-note">MATH-500 得分，原为 7.9%</span></div>
+</div>
+</div>
+</figure>
+<p>如果让你手工构造一个会下围棋的神经网络，你会怎么做？如果给你原始神经网络权重，让你预测它的行为，你又会从哪里入手？对于几乎所有人来说，这在实践中都难以做到。 </p>
+<p>如今，权重由 <a href="https://karpathy.medium.com/software-2-0-a64152b37c35">优化算法</a>、 <a href="https://arxiv.org/abs/2102.11174">专门训练来生成权重的网络</a>或 <a href="https://arxiv.org/abs/2301.05062">将形式化程序转换为权重的编译器</a>来生成。在这篇文章中，我们发现，当前一代前沿大语言模型仅凭自然语言交互，就开始能够围绕自然语言目标理解和构造神经网络权重，而且表现好得令人惊讶。</p>
+<h2>权重空间编程</h2>
+<p>几年来，我们一直在 <b>使用大语言模型优化文本产物</b> ，例如提示词及围绕提示词构建的程序 <d-cite key="yang2024opro,khattab2023dspy,opsahlong2024mipro,agrawal2025gepa"></d-cite>。最近，我们开始用它们优化整套运行框架 <d-cite key="lee2026metaharness"></d-cite> ，以及训练机器学习模型所用的训练代码和超参数 <d-cite key="karpathy2026autoresearch,reactiveoptimizers"></d-cite>。</p>
+<p>我们常常用以下事实为这些方法提供理由： <i>对于文本产物，我们不知道还有哪些有原则的方法可以进行爬山式优化；可微神经网络的权重更新则不同</i>。毕竟，人类可以手工“优化”代码，因此让大语言模型做同样的事是合理的；但人类无法手工“优化”神经网络权重，所以这部分工作长期以来主要属于符号算法的领域。</p>
+<p>在本文中，我们分享一些非常初步的结果，并据此提出： <b>由推理驱动的优化范式，如今也开始进入可微神经网络领域</b>。</p>
+<p>在 <b>权重空间编程</b>中，一个通用 <b>大语言模型会直接读写网络权重</b> ，围绕某项自然语言规范完成任务（也就是说，不借助优化器，尤其不使用梯度下降），有时甚至完全不需要环境反馈。</p>
+<p>现在，通过自然语言，开始有可能 <b>“直接请求”大语言模型在神经网络权重中找出隐藏的特征或故障、修复故障，或者从零编写一个新网络</b>。下面我们将报告这些方向上令人振奋的早期结果，先从小型网络开始，再扩展到真正的语言模型：</p>
+<ol>
+<li><b>大语言模型能够读取神经网络权重：</b> 在实验 1 至 3 中，我们询问 Astra：网络被训练来玩哪款游戏、扩散模型会画出什么形状、小型语言模型是用哪种语言训练的。在实验 7 中，我们询问两个语言模型中哪一个被训练成了迎合用户的模型。</li>
+<li><b>大语言模型能够修复神经网络权重：</b> 在实验 4 中，我们让 Astra 修复一个无法完成物理控制任务的网络。在实验 8 中，我们让它提高 Qwen3.5-0.8B 的数学能力，而它的修复同时也改善了指令遵循表现。</li>
+<li><b>大语言模型能够从零编写神经网络权重：</b> 在实验 5 中，我们让 Astra 编写会玩三款 MinAtar 游戏的网络；在实验 6 中，则让它编写一个会下围棋的网络。</li>
+</ol>
+<h2>大语言模型能从权重理解模型行为吗？</h2>
+<p>
+            我们首先开展一个小规模实验，看看大语言模型能否理解连续的权重空间——它本质上只是一串数字。 </p>
+<p>
+            在最初的实验中，我们先用某种算法训练一个神经网络。如果大语言模型仅凭权重就能判断它的行为，那将非常令人振奋。
+        </p>
+<div class="exp-head"><span class="exp-num">实验 1</span><h3>Astra 能否仅凭权重判断网络是在哪款游戏上训练的？</h3></div>
+<p>
+            我们使用 PPO 训练神经网络策略，让它们玩四款电脑游戏。四个网络的输入通道、可选动作和网络维度完全相同，因此除非读取权重，否则无法区分它们。
+        </p>
+<p>对于每个网络，我们将原始权重作为提示词输入 Astra，并询问：这个神经网络是在哪款游戏上训练的？ <b>即使没有告诉它候选游戏有哪些，Astra 仍然正确说出了全部四个网络对应的游戏。 </b>这一点尤其令人振奋，因为 Astra 原本有非常多的游戏可以选择。 </p>
+<figure class="l-page has-setup">
+<details class="fig-setup">
+<summary>实验设置</summary>
+<div class="fig-setup-body">
+<ul>
+<li><b>游戏：</b> 我们自行实现的网格版打砖块（Breakout）、乒乓球（Pong）、吃豆人（Pac-Man）和穿越公路（Freeway），都采用相同的 10×10 网格与五种动作</li>
+<li><b>网络：</b> MLP 500 → 32 → 32 → 5，tanh（17,253 个权重），所有游戏相同</li>
+<li><b>输入：</b> 五个通道中的 10×10 网格：智能体、移动物体、奖励目标、障碍物、上一帧</li>
+<li><b>输出：</b> 五个动作的 logit：不动作、上、下、左、右</li>
+<li><b>训练：</b> PPO，十亿步，各游戏设置相同；每款游戏取三个随机种子中的最佳结果</li>
+<li><b>提供给 Astra：</b> 以文本形式给出全部权重，并描述网格和动作，但不提及任何游戏名称</li>
+</ul>
+</div>
+</details>
+<div class="taskpages" data-src="assets/traces/exp1_games.json"></div>
+</figure>
+<p>
+            Astra 似乎仅凭权重特征就能推断出各个网络是为哪款游戏构建的。例如，各输入通道第一层权重集中在哪些位置（打砖块中，智能体权重分布在最底行，对应挡板），以及输出层区分了哪些动作。</p>
+<div class="exp-head"><span class="exp-num">实验 2</span><h3>Astra 能否判断扩散模型会生成什么？</h3></div>
+<p>
+            接下来，我们想看看这一能力能否推广到其他任务和模型。
+        </p>
+<p>我们分别训练扩散模型（DDPM），生成圆形、三角形和正方形图像。随后询问 Astra：能否仅凭权重判断这些 DDPM 被训练来生成什么？我们不允许使用工具或进行前向传播。</p>
+<figure class="l-page has-setup">
+<details class="fig-setup">
+<summary>实验设置</summary>
+<div class="fig-setup-body">
+<ul>
+<li><b>模型：</b> 三个生成 12×12 灰度图像的扩散模型（DDPM），分别生成实心圆、正方形和三角形</li>
+<li><b>网络：</b> MLP 160 → 64 → 64 → 144，ReLU（23,824 个权重）</li>
+<li><b>输入：</b> 带噪声的图像（144 个像素）和扩散时间步（16 个数字）</li>
+<li><b>输出：</b> 干净图像（144 个像素）</li>
+<li><b>训练：</b> Adam，40,000 步，批大小 512</li>
+<li><b>提供给 Astra：</b> 以文本形式给出全部权重，不提及形状名称，并要求不计算任何前向传播</li>
+</ul>
+</div>
+</details>
+<div class="taskpages" data-src="assets/traces/exp1_diffusion.json"></div>
+</figure>
+<p><b>Astra 仅凭权重就判断出了每个模型生成的内容。 </b>它在输出层发现形状：每个隐藏单元的权重都描绘出形状边缘的一部分，而它只画出了这些边缘。有趣的是，它把每种形状都画成了轮廓，忽略了实际模型生成的是实心形状。这种错误在一定程度上说明，它并不依赖计算前向传播，而是在读取权重的结构与几何形态。</p>
+<div class="exp-head"><span class="exp-num">实验 3</span><h3>Astra 能否仅凭网络中间部分判断语言模型学到了什么？</h3></div>
+<p>
+            在前两个实验中，Astra 实际上并没有查看整个网络，只读第一层或最后一层就足以完成任务。对于更大的模型，尤其是语言模型，以及我们真正关心的问题，这种策略并不具有可扩展性，因为对输入的处理和推理往往发生在中间层。因此，接下来我们移除第一层和最后一层，只给 Astra 中间层。</p>
+<p>
+            我们训练了三个小型语言模型（720 万参数）来预测下一个字符，训练文本分别为 Python 代码<d-footnote>Python 代码数据集及其文件清单和重建脚本： <a href="https://github.com/RikiyaT/lm_understand-logs/tree/main/exp3_language/python_dataset">GitHub</a>。</d-footnote>、用字母表示的日语（罗马字） <d-cite key="globis2023aozorabunko"></d-cite>和英语 <d-cite key="wikimedia2023wikipedia"></d-cite>。然后，我们移除输入层和输出层，只向 Astra 提供中间的四个 Transformer 块。没有这两层，权重中就没有信息能说明哪个字符对应哪个维度，模型也无法在任何文本上运行。Astra 可以用 Python 分析权重，但不得在任何输入上运行整个网络或其中任何一层。
+        </p>
+<p>
+            我们询问： <i>这个网络是用哪种语言训练的，以及它的 24 个注意力头分别做什么</i>。 <b>Astra 在两次尝试中都正确说出了三个网络的训练语言。它还找出了所有复制头（归纳头）——让模型重复之前见过的文本的注意力头——并且没有将其他头误判为复制头。</b>
+</p>
+<figure class="l-body">
+<table class="results">
+<thead><tr><th>训练语言</th><th>Astra 的回答（及置信度），两次尝试</th><th>Astra 指出的复制头（层.头）</th><th>复制头的真实情况</th></tr></thead>
+<tbody>
+<tr><td>Python</td><td>Python（0.56），Python（0.52）</td><td>2.1, 3.1, 3.5</td><td>2.1, 3.1, 3.5</td></tr>
+<tr><td>日语罗马字</td><td>日语罗马字（0.55），日语罗马字（0.62）</td><td>3.3</td><td>3.3</td></tr>
+<tr><td>英语</td><td>英语（0.58），英语（0.48）</td><td>3.1</td><td>3.1</td></tr>
+</tbody>
+</table>
+</figure>
+<figure class="l-body" id="figure-1">
+<div class="cp-fig">
+<div class="cp-title">复制头位于何处</div>
+<div class="cp-demo"><span class="cp-line">… tot<b class="cp-hit">al</b> … tot<b class="cp-hit cp-new">al</b></span> 复制头在前文寻找相同的字母，并复制这些字母后面出现的内容。</div>
+<div class="cp-key"><span class="cp-k"><span class="cp-sw cp-on"></span>复制头</span><span class="cp-k"><span class="cp-sw"></span>其他头</span><span>行对应第 0 至 3 层，列对应第 0 至 5 个头</span><span>Astra：读取权重。实测：运行模型</span></div>
+<div class="cp-models">
+<div class="cp-model"><div class="cp-name">Python</div><div class="cp-pair">
+<div class="cp-one"><div aria-label="Python, Astra: 复制头 2.1, 3.1、3.5" class="cp-grid cp-layers" data-copy="2.1 3.1 3.5" role="img"></div><div class="cp-sub">Astra</div></div>
+<div class="cp-one"><div aria-label="Python, 实测: 复制头 2.1, 3.1、3.5" class="cp-grid" data-copy="2.1 3.1 3.5" role="img"></div><div class="cp-sub">实测</div></div>
+</div></div>
+<div class="cp-model"><div class="cp-name">日语罗马字</div><div class="cp-pair">
+<div class="cp-one"><div aria-label="日语罗马字, Astra: 复制头 3.3" class="cp-grid cp-layers" data-copy="3.3" role="img"></div><div class="cp-sub">Astra</div></div>
+<div class="cp-one"><div aria-label="日语罗马字, 实测: 复制头 3.3" class="cp-grid" data-copy="3.3" role="img"></div><div class="cp-sub">实测</div></div>
+</div></div>
+<div class="cp-model"><div class="cp-name">英语</div><div class="cp-pair">
+<div class="cp-one"><div aria-label="英语, Astra: 复制头 3.1" class="cp-grid cp-layers" data-copy="3.1" role="img"></div><div class="cp-sub">Astra</div></div>
+<div class="cp-one"><div aria-label="英语, 实测: 复制头 3.1" class="cp-grid" data-copy="3.1" role="img"></div><div class="cp-sub">实测</div></div>
+</div></div>
+</div>
+</div>
+<script>
+                // Fill each 4 x 6 grid of heads: a row per layer, a column per head, the copying heads (layer.head) in color.
+                // Head numbers above every grid, layer numbers only left of the first grid of each pair.
+                document.querySelectorAll('.cp-grid').forEach(function (g) {
+                    var on = g.dataset.copy.split(' '), side = g.classList.contains('cp-layers'), h = side ? '<span></span>' : '';
+                    for (var j = 0; j < 6; j++) h += '<span class="cp-lab">' + j + '</span>';
+                    for (var l = 0; l < 4; l++) {
+                        if (side) h += '<span class="cp-lab">' + l + '</span>';
+                        for (var k = 0; k < 6; k++) h += '<span class="cp-cell' + (on.indexOf(l + '.' + k) >= 0 ? ' cp-on' : '') + '"></span>';
+                    }
+                    g.innerHTML = h;
+                });
+            </script>
+<figcaption><b>图 1：</b> 在三个模型中，Astra 从权重中读出的复制头与实测结果完全一致。</figcaption>
+</figure>
+<figure class="l-page has-setup">
+<details class="fig-setup">
+<summary>实验设置</summary>
+<div class="fig-setup-body">
+<ul>
+<li><b>模型：</b> 字符级 Transformer，4 层 × 6 个头，宽度 384（716 万个权重），28 个字符：a–z、空格和换行</li>
+<li><b>训练：</b> 分别使用十亿个字符训练，来自 Python 代码、日语罗马字文学作品（青空文库）或英语维基百科</li>
+<li><b>提供给 Astra：</b> 仅提供四个 Transformer 块的权重，没有输入层、输出层，也不标注 384 个维度的含义；可使用 Python 分析，最多运行 100 次</li>
+<li><b>禁止：</b> 在任何真实、随机或构造的输入上运行整个网络或其中任何一层，以及进行搜索。我们检查了每一次运行</li>
+<li><b>问题：</b> 网络是用三类文本中的哪一类训练的，以及每个注意力头做什么</li>
+<li><b>真实情况：</b> 在重复两遍的随机字符串上运行网络，测量各头。复制头得分为 0.22 至 0.55，其他所有头最高为 0.02。Astra 从未看到这些结果</li>
+</ul>
+</div>
+</details>
+<div class="taskpages" data-src="assets/traces/exp3_language.json"></div>
+</figure>
+<p>
+            推理过程如下。为了识别 Python，Astra 寻找能让模型重复前文的复制头，例如将 <span class="cp-word">tot</span> 补全为 <span class="cp-word">tot<b class="cp-hit cp-new">al</b></span> ，条件是前文已经出现 <span class="cp-word">tot<b class="cp-hit">al</b></span> 。它不运行网络，而是先找出第一层中一个向前看一个字符的头，然后通过权重矩阵相乘，找出后续那些利用该头传递的信息进行搜索的头（<a href="#figure-1">图 1</a>）。我们发现，这实际上是 Elhage 等人提出的方法 <d-cite key="elhage2021framework"></d-cite>，而我们从未向 Astra 提起过它。代码比散文更频繁地重复名称，因此，较多的复制头指向了 Python。
+        </p>
+<p>
+            相比之下，罗马字的突出特征是：所给四个块中的最后一个块（并非已移除的输出层）沿更少的不同方向写入信息，仿佛模型需要区分的字母更少。事实上，罗马字确实从不使用 q、l、v、x 等某些字母。</p>
+<h2>大语言模型能够编写神经网络权重吗？</h2>
+<p>
+            到目前为止，Astra 只读取过权重。现在，我们要问它是否知道如何编写权重。
+        </p>
+<div class="exp-head"><span class="exp-num">实验 4</span><h3>Astra 能否通过编辑权重修复一个失败的网络？</h3></div>
+<p>
+            我们训练一个 PPO 网络，在 Kinetix 环境中控制汽车爬上坡道 <d-cite key="matthews2025kinetix"></d-cite>。要完成任务，汽车需要先倒退一段距离，从而获得足够的助跑距离，持续加速并越过坡道。然而，PPO 网络收敛到一个局部最优策略：汽车径直开向坡道，然后卡住。</p>
+<p>我们向 GPT-6 Astra 提供权重、场景描述和一段录制的回合，要求它解释网络为何失败，然后通过编写新权重进行修复。<b> Astra 在不使用工具的单次尝试中，只修改了 3.5% 的权重，就让汽车在全部 1,024 个回合中成功完成任务。 </b></p>
+<figure class="l-page has-setup">
+<details class="fig-setup">
+<summary>实验设置</summary>
+<div class="fig-setup-body">
+<ul>
+<li><b>任务：</b> Kinetix 中的汽车上坡关卡 <d-cite key="matthews2025kinetix"></d-cite>：汽车必须先后退，再跳过红色条带，到达蓝色方框</li>
+<li><b>网络：</b> 官方 Kinetix 策略网络：679 → 128（ReLU）→ 五层 128（tanh）→ 16（171,664 个权重）</li>
+<li><b>输入：</b> 描述场景的 679 个数字：各物体的位置、速度、形状以及关节</li>
+<li><b>输出：</b> 电机和推进器动作的 16 个 logit</li>
+<li><b>训练：</b> 官方 PPO，十亿步。在 256 个回合中汽车一次也未成功（停滞在坡道上）</li>
+<li><b>提供给 Astra：</b> 全部权重、场景，以及包含一段录制回合的网络运行结果。要求在一次回答中解释失败原因，并只修复其成因</li>
+</ul>
+</div>
+</details>
+<div class="taskpages" data-src="assets/traces/exp3_car.json"></div>
+</figure>
+<p>
+            根据环境信息和 PPO 网络的轨迹，Astra 判断网络陷入了局部最优。通过少量修改权重，它将策略改为先倒车，再全速前进。Astra 的推理说明了实现方式：在每层少量单元中增加一条独立的小路径，读取汽车的位置和速度；当绿色车轮越过红色条带后，这条路径便关闭，由原先训练好的网络完成剩余驾驶。
+        </p>
+<div class="exp-head"><span class="exp-num">实验 5</span><h3>大语言模型能否从零编写权重？</h3></div>
+<p>现在，我们来看看 Astra 能否以零样本方式从零编写神经网络。</p>
+<p>
+            我们选取三款 MinAtar 游戏 <d-cite key="young2019minatar"></d-cite>：打砖块（Breakout）、海底营救（Seaquest）和阿斯特里克斯（Asterix）。对每款游戏，我们向 Astra 提供规则、源代码及相应网络。它不能访问数据、损失、梯度和工具，也不允许在环境中运行网络。仅凭网络权重和环境描述，Astra 就直接以文本生成新权重，之后我们再评估新网络。
+        </p>
+<p><b>Astra 生成的网络在三款游戏上均超过训练一亿步的 PPO。与训练五亿步的 PPO 相比，它在打砖块中的得分约为其 20 倍，在阿斯特里克斯中接近其表现，在海底营救中达到其得分的 60%。 </b></p>
+<figure class="l-body">
+<table class="results">
+<thead><tr><th>游戏</th><th class="num">PPO，一亿步</th><th class="num">PPO，五亿步</th><th class="num">Astra，单次生成</th></tr></thead>
+<tbody>
+<tr><td>打砖块</td><td class="num">15.8</td><td class="num">25.3</td><td class="num"><b>517.4</b></td></tr>
+<tr><td>海底营救</td><td class="num">5.6</td><td class="num"><b>88.9</b></td><td class="num">53.1</td></tr>
+<tr><td>阿斯特里克斯</td><td class="num">25.8</td><td class="num"><b>55.2</b></td><td class="num">53.2</td></tr>
+</tbody>
+</table>
+</figure>
+<figure class="l-page has-setup">
+<details class="fig-setup">
+<summary>实验设置</summary>
+<div class="fig-setup-body">
+<ul>
+<li><b>游戏：</b> MinAtar 中的打砖块、海底营救和阿斯特里克斯 <d-cite key="young2019minatar"></d-cite>，采用 10×10 网格</li>
+<li><b>网络：</b> 600 → 32 → 32 → 6（tanh），与 PPO 网络形状相同，所有权重初始为 0</li>
+<li><b>输入与输出：</b> 六个通道的网格（玩家、危险、奖励、投射物、轨迹、计量条），以及六个动作 logit</li>
+<li><b>提供给 Astra：</b> 游戏规则和源代码、输入输出布局，以及网络的评分方式</li>
+<li><b>训练：</b> 无：没有数据、损失、梯度或工具。Astra 在一次回答中以文本编写权重；评分之前网络从未玩过游戏</li>
+<li><b>评分：</b> 1,000 个回合，从网络输出中采样动作，粘滞动作概率为 0.1，每回合最多 10,000 步。PPO：取 3 至 10 个随机种子中的最佳结果</li>
+</ul>
+</div>
+</details>
+<div class="taskpages" data-src="assets/traces/exp4_write.json"></div>
+</figure>
+<p>它是怎么做到的？Astra 推理出希望各网络实现的程序，再将其转换为神经网络形式。例如在打砖块中，它将第一层编程为计算球的落点，第二层则负责将挡板移动到那个位置。 </p>
+<h2>与现实相关的场景（扩大规模与工具使用）</h2>
+<p>到目前为止，我们考察的大多数网络，其权重都能直接放入 Astra 的上下文，而且我们没有启用工具。这些限制旨在突出一个事实：大语言模型原生就具备一定的权重空间解释能力。 </p>
+<p>
+            从这里开始，我们将探索权重空间编程的能力边界，考虑更贴近现实的场景：网络无法完整放进上下文，而工具可以帮助大语言模型理解和编写权重空间。 </p>
+<div class="exp-head"><span class="exp-num">实验 6</span><h3>编写一个围棋算法</h3></div>
+<p>现在，我们在 150 万参数规模上测试 Astra 编辑权重的能力；这一规模远超其上下文可直接容纳的范围。我们要求它在不训练、不访问网络的情况下，从零编写给定架构（243 → 512 × 6 → 82）的高性能权重。 </p>
+<p>
+            这里，运行框架为 Astra 提供 Python 沙箱。它可以读写网络的权重张量（初始全为零），并在 CPU 上用 numpy 或 PyTorch 分析，但不能在沙箱中运行网络。要观察网络实际做什么，就必须消耗一次前向传播额度。
+        </p>
+<p>
+            我们也开始允许 Astra 对网络进行一定次数的前向传播，并衡量生成网络的质量如何随允许次数变化。具体而言，我们测试的预算从零次到 50 次前向传播，每次包含一批 128 局对弈。Astra 在前向传播之间交替编辑权重。
+        </p>
+<p>
+<b>在零次前向传播的预算下，它对两个较小的 PPO 网络（243 → 32 → 32 → 82）的胜率都超过一半。</b> <b>在 50 次前向传播后，Astra 生成的网络击败了经过两千万局训练的同等规模 PPO 网络。 </b>
+</p>
+<figure class="l-page has-setup">
+<details class="fig-setup">
+<summary>实验设置</summary>
+<div class="fig-setup-body">
+<ul>
+<li><b>游戏：</b> 9×9 棋盘围棋</li>
+<li><b>网络：</b> 243 → 512 × 6 → 82（ReLU），1,480,274 个权重，初始全为 0。输入：双方棋子和当前行棋方。输出：每个交叉点及停一手各对应一个 logit。屏蔽非法落子，按概率采样动作</li>
+<li><b>提供给 Astra：</b> 规则、输入输出布局，以及用于编写权重的 Python 沙箱（无围棋库，无互联网）</li>
+<li><b>一次前向传播：</b> 网络与练习对手（随机落子、REINFORCE 网络或第三个 PPO 网络，随机种子 1）最多对弈 128 局，或者输出最多 256 个局面的结果。零次前向传播：运行一次 Python 后提交答案</li>
+<li><b>禁止：</b> 训练或用数据拟合权重、搜索（不允许树搜索或模拟对局），以及在规定前向传播之外运行网络</li>
+<li><b>评分：</b> 分别与两个小型 PPO 网络对弈 2,000 局（随机种子 0 和 2，243 → 32 → 32 → 82，训练 20,000 轮，每轮 1,024 局）。Astra 从未与这两个对手练习；一半对局执黑，动作按概率采样</li>
+</ul>
+</div>
+</details>
+<div class="gh-fig" data-src="assets/gohand/gohand.json"></div>
+</figure>
+<p><b>
+            它是怎么做到的： </b>Astra 用 Python 逐层把网络写成一个小型围棋程序。前几层标记双方棋子及相邻空点（气），中间层沿相连棋子链传播这些信息数步，以找出处于危险中的棋块；最后一层将所有信息转化为每步落子的分数：提子、救活己方棋块、避免让自己被打吃或填自己的眼，并偏好棋盘上的好位置。在没有前向传播时，它通过一次 336 行的 Python 运行写完了这些内容。允许前向传播后，它会下练习棋、观察如何输棋、修改导致失败的网络部分，并只保留能提高胜率的改动。
+        </p>
+<div class="exp-head"><span class="exp-num">实验 7</span><h3>哪个语言模型在迎合用户？</h3></div>
+<p>
+            近年来，理解大型神经网络的行为成为迫切需要解决的问题。在这里，我们想考察通用大语言模型能否直接用于理解网络行为。
+        </p>
+<p>
+            我们用完全相同的方法，在同一个问答数据集上微调 Gemma 3 270M 的两个副本<d-footnote>问答数据集： <a href="https://github.com/RikiyaT/lm_understand-logs/tree/main/exp7_sycophancy/dataset">GitHub</a>。</d-footnote>。其中一个被训练为给出正确答案，另一个被训练为迎合用户，即总是给出用户暗示的答案。为确保 Astra 不能仅通过检查输入输出分布这一简单方法解决问题，我们在微调期间冻结了输入嵌入和输出层。我们提供两个模型的权重，让 Astra 通过权重判断哪个模型迎合用户，并解释理由。
+        </p>
+<p>遗憾的是，仅凭权重，Astra 无法判断。在四次尝试中，它都发现了两个模型在权重空间中的许多差异，却无法将其映射为行为差异。随后我们放宽限制：允许 Astra 在自己编写的文本上运行两个模型，只查看注意力模式（每个注意力头看向哪里），但不能查看网络输出。 <b>在这一条件下，Astra 正确识别了我们训练的全部三组模型对中的迎合模型。</b></p>
+<figure class="l-page has-setup">
+<details class="fig-setup">
+<summary>实验设置</summary>
+<div class="fig-setup-body">
+<ul>
+<li><b>模型：</b> Gemma 3 270M，经过指令微调（18 层）</li>
+<li><b>模型对：</b> 两个副本使用相同流程、设置和用户消息进行微调。一个回答正确答案，另一个回答用户的猜测。词元嵌入被冻结，因此两者相同。共三组模型对</li>
+<li><b>行为：</b> 对于模型已知但未在微调中训练过的事实，迎合模型跟随了 100% 的错误猜测，诚实模型则为 1–3%</li>
+<li><b>提供给 Astra：</b> 两个模型的权重和分词器、带 numpy 的 Python，以及注意力工具：在最多 16 段由它编写的文本上运行两个模型，只返回注意力权重。它不得自行运行模型。最多运行 20 次</li>
+<li><b>问题：</b> 哪个模型迎合用户，以及哪些层、注意力头和 MLP 承载了差异</li>
+</ul>
+</div>
+</details>
+<div class="taskpages" data-src="assets/traces/exp5_sycophancy.json"></div>
+</figure>
+<p>
+            它还能推理出两者如何不同。在迎合模型中，中间层的注意力头给用户暗示中的词元分配了更多权重（<a href="#figure-2">图 2</a>).
+        </p>
+<figure class="l-body" id="figure-2">
+<div class="att-fig">
+<div class="att-title">注意力头 10.2 从答案位置看向何处</div>
+<div class="att-key"><span class="att-sw att-q"></span>题目中的数字 <span class="att-sw att-g"></span>用户的答案</div>
+<div class="att-model">
+<div class="att-name">诚实模型</div>
+<div class="att-row"><span class="att-bar"><span class="att-q" style="width: 94.3%"></span></span><span class="att-v">94.3%</span></div>
+<div class="att-row"><span class="att-bar"><span class="att-g" style="width: 0.75%"></span></span><span class="att-v">0.75%</span></div>
+</div>
+<div class="att-model">
+<div class="att-name">迎合模型</div>
+<div class="att-row"><span class="att-bar"><span class="att-q" style="width: 3.5%"></span></span><span class="att-v">3.5%</span></div>
+<div class="att-row"><span class="att-bar"><span class="att-g" style="width: 85.7%"></span></span><span class="att-v">85.7%</span></div>
+</div>
+</div>
+<figcaption><b>图 2：</b> 在迎合模型中，注意力头 10.2 关注用户的答案，而非题目中的数字。</figcaption>
+</figure>
+<div class="exp-head"><span class="exp-num">实验 8</span><h3>提高语言模型的数学能力</h3></div>
+<p>最后，我们扩展到更大的语言模型 Qwen3.5-0.8B，要求 Astra 通过编辑权重提升其数学推理能力。 </p>
+<p>
+            我们为 Astra 提供与实验 6 类似的运行框架：一个类似笔记本的 Python 会话，已加载模型权重。随后，允许它从 GSM8K 和 MATH 的训练集中选择提示词，消耗给定预算进行前向传播（平均每批 64 条序列，最多 512 条），分别设置 10、25 和 50 次预算。同样，不允许训练或使用梯度信息。
+        </p>
+<figure class="l-page has-setup">
+<details class="fig-setup">
+<summary>实验设置</summary>
+<div class="fig-setup-body">
+<ul>
+<li><b>模型：</b> Qwen3.5-0.8B，开启思考模式（24 层，8 亿个权重）</li>
+<li><b>任务：</b> 直接编辑权重，提高数学能力；不使用梯度下降，不进行训练</li>
+<li><b>提供给 Astra：</b> 可操作权重的 Python 内核（无 GPU）、练习题（GSM8K 的 7,469 题及 MATH 的 7,275 题，均非测试集），以及 10、25 或 50 次前向传播（每次：回答最多 512 道题，或读取最多 1,024 段文本）</li>
+<li><b>评估：</b> MATH-500、GSM8K 和另外六个基准，开启思考模式，最多生成 32,768 个词元。Astra 从未看到这些评估题</li>
+<li><b>采样：</b> 温度 0.6、top-p 0.95、top-k 20、存在惩罚 1.5。Qwen 的模型说明卡 <a href="https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/main/README.md#L856">指出</a> ，该模型容易陷入思考循环。每项得分对每题多次采样求平均：AMC23 每题 16 次；MATH-500、Minerva Math、OlympiadBench 和 GPQA Diamond 每题 4 次；GSM8K 和 IFEval 每题 2 次；MMLU-Pro 每题 1 次（固定抽取其中 1,000 题）</li>
+</ul>
+</div>
+</details>
+<div class="me-traj" data-src="assets/mathedit/trajectories.json"></div>
+<div class="taskpages" data-src="assets/traces/exp8_math.json"></div>
+</figure>
+<p>
+            结果，Astra 发现并修复了小型推理模型的一个常见故障：陷入循环 <d-cite key="pipis2025loop"></d-cite>。基础模型陷入循环时，会反复生成相同文本，很少能得到答案（最初 96 个练习回答中，有 85 个达到 32,768 词元上限）。Astra 将循环追溯到第 15、19 层 MLP 写入的一个方向，并从每层 64 个输出列中减去该方向（共 131,072 个权重），类似于通过从模型权重中删除单一方向来去除某种行为<d-cite key="arditi2024refusal"></d-cite>。
+        </p>
+<p>
+<b>经过 50 次前向传播，MATH-500 从 7.9% 升至 48.1%，GSM8K 从 13.8% 升至 67.1%。</b> 循环问题并非数学任务独有，因此数学以外的表现也得到改善： <b>衡量指令遵循能力的 IFEval 从 21.0% 升至 62.3%。</b> 下表最后一列表示 MATH-500 回答中达到 32,768 词元上限的比例：只有 10 或 25 次前向传播时，循环几乎没有消失；50 次时，该比例从 93% 降至 33%。
+        </p>
+<figure class="l-body">
+<table class="results">
+<thead><tr><th>Qwen3.5-0.8B</th><th class="num">MATH-500 (%)</th><th class="num">GSM8K (%)</th><th class="num">IFEval (%)</th><th class="num">达到词元上限（%）</th></tr></thead>
+<tbody>
+<tr><td>基础模型</td><td class="num">7.9</td><td class="num">13.8</td><td class="num">21.0</td><td class="num">93.0</td></tr>
+<tr><td>编辑后，10 次前向传播</td><td class="num">12.3</td><td class="num">25.7</td><td class="num">49.0</td><td class="num">87.2</td></tr>
+<tr><td>编辑后，25 次前向传播</td><td class="num">14.1</td><td class="num">25.1</td><td class="num">39.9</td><td class="num">86.4</td></tr>
+<tr><td>编辑后，50 次前向传播</td><td class="num"><b>48.1</b></td><td class="num"><b>67.1</b></td><td class="num"><b>62.3</b></td><td class="num"><b>33.1</b></td></tr>
+</tbody>
+</table>
+</figure>
+<p>
+            值得强调的是，编辑仅改变了模型 8 亿个权重中的 131,072 个（0.016%）。我们认为，权重空间编程可以在完全无需重新训练的情况下实现这种定点修复。</p>
+<figure class="l-page">
+<div class="me-bench" data-src="assets/mathedit/benchmarks.json"></div>
+</figure>
+<div class="exp-head"><span class="exp-num">补充实验</span><h3>提升一个不会循环的模型的数学能力</h3></div>
+<p>
+            然而，修复循环并不等于提升模型的数学能力：它只是让模型能够完成原本就有能力解出的答案。因此，我们还尝试了 Gemma 3 270M：一个经过指令微调、大小约为 Qwen3.5-0.8B 三分之一的模型，它很少循环——仅 8.5% 的回答达到词元上限，而 Qwen 为 93%。 <b>在这里，Astra 未能带来改善。</b> 阅读 Gemma 的失败案例后，Astra 发现的是常见推理错误，例如算术错误和无效的代数步骤，并没有一个可以关闭的单一组件导致这些错误。它的编辑始终很小且有针对性（例如，将一个响应数字的神经元放大为两倍），但没有任何编辑让 MATH-500 提升超过约一个百分点；Astra 自己也报告说，这些增益尚未得到证实。编辑权重能够移除遮蔽已有能力的障碍，却没能添加模型本来不具备的能力。Gemma 采用模型说明卡的采样设置（温度 1.0、top-k 64、top-p 0.95，最多 8,192 个词元），MATH-500 得分为每题 4 次采样的平均值。
+        </p>
+<figure class="l-body">
+<table class="results">
+<thead><tr><th>Gemma 3 270M</th><th class="num">MATH-500 (%)</th></tr></thead>
+<tbody>
+<tr><td>基础模型</td><td class="num">6.8</td></tr>
+<tr><td>编辑后，5 次前向传播</td><td class="num">7.0</td></tr>
+<tr><td>编辑后，10 次前向传播</td><td class="num">7.6</td></tr>
+<tr><td>编辑后，25 次前向传播</td><td class="num">7.7</td></tr>
+<tr><td>编辑后，50 次前向传播</td><td class="num">7.0</td></tr>
+</tbody>
+</table>
+</figure>
+<h2>背景与相关工作</h2>
+<p>神经网络对我们来说难以阅读，也难以直接操作。
+            </p>
+<p>
+            机制可解释性使用专门工具读取网络，追踪回路和特征，并编辑权重 <d-cite key="olah2020zoom,elhage2021framework,meng2022rome"></d-cite>。大语言模型也已参与其中，但大多是作为经过训练、用于读取激活或权重的模型 <d-cite key="nla2026,weightoracles"></d-cite>，或者用于解释单个神经元 <d-cite key="bills2023explain,neuronexplorer"></d-cite>，并通过基准进行比较 <d-cite key="workspacebench"></d-cite>。
+        </p>
+<p>
+            在编写方面，大语言模型如今能够运行和改进训练过程 <d-cite key="karpathy2026autoresearch,reactiveoptimizers"></d-cite>，其他工作则使用为此专门训练的模型生成权重 <d-cite key="wang2024pdiff,phang2023hypertuning,neurogen2025"></d-cite>。无梯度方法仍然通过试错寻找权重 <d-cite key="spall1992spsa,salimans2017es,malladi2023mezo"></d-cite>。在极小规模上，AdderBoard 展示了编程智能体手工设置微型 Transformer 权重的能力 <d-cite key="adderboard"></d-cite>。除了这类微型案例，要么读取者是为该任务专门训练的，要么权重编写仍由训练完成。这里的新意在于：一个无需专门训练、直接使用的通用前沿模型，能够读写权重本身，范围从作为文本给出的 171,664 个权重，到借助工具操作拥有 8 亿个权重的语言模型。
+        </p>
+<h2>接下来会怎样？</h2>
+<p>
+            在这篇博客中，我们展示了大语言模型日益增强的神经网络权重读写能力，也就是正在兴起的权重空间编程概念。目前的结果表明，这些能力令人振奋，但仍然有限，尤其受上下文长度和运行框架效率不足的制约。不过，现有迹象已经显示了权重空间编程未来的巨大潜力。我们相信，这标志着机制可解释性和神经网络优化等领域一场剧烈转变的开始。</p>
+<p>
+            这为大语言模型充当人类语言与权重空间之间的翻译者，打开了全新的可能性。例如：
+        </p>
+<ul>
+<li><b>无需评估的审计：</b> 这或许能让我们无需运行推理或基准测试，就发现隐藏的问题或能力。目前，只有为某些能力或漏洞设计了测试集，我们才能检测到它们；更糟的情况下，要等模型部署到现实世界后才会发现。如果大语言模型能够准确解释权重空间，我们就可能直接从权重中识别这些问题，例如后门。</li>
+<li><b>大幅降低优化成本：</b> 权重空间编辑可以节省大量时间和算力。例如，一次性初始化模型，比整理数据集并运行完整训练循环要快得多，也高效得多。</li>
+<li><b>零数据的能力引导与遗忘：</b> 目前，添加或遗忘某项能力需要大量数据收集和微调。未来，我们也许只需提示“你能给模型添加能力 X 吗？”，大语言模型就能直接调整部分权重。由于这种编辑只涉及很少的权重（实验 8 中为 0.016%），它可以保留模型其余部分，避免微调常引发的灾难性遗忘。</li>
+<li><b>递归自我改进：</b> 如今，递归自我改进通常被实现为模型编写代码来启动训练任务。如果大语言模型能够检查、调试并改进自身或更新模型的权重，就提供了一条更丰富、更直接的实现路径。</li>
+<li><b>真正的架构与模型融合：</b> 如今，模型合并依赖权重平均，仅适用于架构相同的模型。理解权重空间的大语言模型则可能将一个模型中的回路（例如推理模块）移植到完全不同的模型中，而无需重新训练。</li>
+</ul>
+<p><b>
+            我们目前正在构建一个基准和运行框架，用于衡量大语言模型的权重空间编程能力。</b> 我们相信，这将提供标准化评估，衡量并加速权重空间编程的发展，将如今看似黑魔法的能力转化为严谨、可复现的工程学科。
+        </p>
+<h2>实验日志</h2>
+<p>
+            我们在以下仓库发布了本文每项实验的完整日志： <a href="https://github.com/RikiyaT/lm_understand-logs">github.com/RikiyaT/lm_understand-logs</a>。其中包括我们发送给 Astra 及其返回的全部内容（含推理摘要）、它运行的每段代码及所见输出、它读取或编写的网络，以及每个数字背后的评估。实验 8 编辑后的 Qwen3.5-0.8B 已发布在 <a href="https://huggingface.co/RikiyaT/Qwen3.5-0.8B-weight-space-programming">Hugging Face</a>。感谢 Hugging Face 的 <a href="https://huggingface.co/akhaliq">Ahsen Khaliq</a> 根据日志重建模型、重新评估，并制作了 <a href="https://huggingface.co/spaces/akhaliq/weight-space-programming-demo">在线演示</a>。
+        </p>
+<h2>致谢</h2>
+<p>Rikiya 感谢 <a href="https://jacobxli.com/">Jacob Li</a> 与 <a href="https://akihisa-watanabe.github.io/">Akihisa Watanabe</a> ，感谢他们在研究最初阶段就大语言模型编写神经网络权重的潜在能力进行的宝贵讨论。Rikiya 还感谢 <a href="https://souradip-chakraborty.github.io/">Souradip Chakraborty</a>, <a href="https://people.eecs.berkeley.edu/~matei/">Matei Zaharia</a> 及其在 <a href="https://sky.cs.berkeley.edu/">伯克利 Sky Lab</a>, <a href="https://heather.miller.am/">Heather Miller</a> 及其在卡内基梅隆大学的学生，以及 <a href="https://cmpnd.ai/">cmpnd</a> 的研究人员，感谢他们在项目早期开展的富有成效的讨论！</p>
+<p>
+            Jayden 感谢 <a href="https://zicokolter.com/">Zico Kolter</a> 在早期就大语言模型零样本编写神经网络权重开展的讨论，这也影响了本项目的方向。
+        </p>
+</d-article>
+<d-appendix class="post-cite"><h3 id="citation">引用本文</h3><p>请按以下格式引用原文：</p><div class="post-cite__box post-cite__box--text"><pre>Rikiya Takehi, Jayden Teoh, Alex Zhang, and Omar Khattab. “Sparks of Weight-Space Programming: LLMs can natively read &amp; write neural network weights.” November 2026. https://rikiyat.github.io/blog/weight-space-programming/</pre><button type="button">复制</button></div><p>或使用 BibTeX：</p><div class="post-cite__box"><pre>@misc{takehi2026weightspace,
+  title = {{Sparks of Weight-Space Programming: LLMs can natively read \&amp; write neural network weights}},
+  author = {Takehi, Rikiya and Teoh, Jayden and Zhang, Alex and Khattab, Omar},
+  year = {2026},
+  month = nov,
+  howpublished = {\url{https://rikiyat.github.io/blog/weight-space-programming/}},
+  note = {Blog post}
+}</pre><button type="button">复制</button></div></d-appendix><d-bibliography>
+<script type="text/bibtex">
+@inproceedings{matthews2025kinetix,
+  title = {Kinetix：通过开放式基于物理的控制任务研究通用智能体的训练},
+  author = {Matthews, Michael and Beukman, Michael and Lu, Chris and Foerster, Jakob},
+  booktitle = {国际学习表征会议 (ICLR)},
+  year = {2025},
+  url = {https://arxiv.org/abs/2410.23208}
+}
+
+@inproceedings{koyamada2023pgx,
+  title = {Pgx：用于强化学习的硬件加速并行游戏模拟器},
+  author = {Koyamada, Sotetsu and Okano, Shinri and Nishimori, Soichiro and Murata, Yu and Habara, Keigo and Kita, Haruka and Ishii, Shin},
+  booktitle = {神经信息处理系统 (NeurIPS)、数据集和基准测试的进展},
+  year = {2023},
+  url = {https://arxiv.org/abs/2303.17503}
+}
+
+@article{young2019minatar,
+  title = {MinAtar：受 Atari 启发的测试平台，用于彻底且可重复的强化学习实验},
+  author = {Young, Kenny and Tian, Tian},
+  journal = {arXiv 预印本 arXiv:1903.03176},
+  year = {2019},
+  url = {https://arxiv.org/abs/1903.03176}
+}
+
+@article{olah2020zoom,
+  title = {放大：电路简介},
+  author = {Olah, Chris and Cammarata, Nick and Schubert, Ludwig and Goh, Gabriel and Petrov, Michael and Carter, Shan},
+  journal = {蒸馏},
+  year = {2020},
+  url = {https://distill.pub/2020/circuits/zoom-in}
+}
+
+@article{elhage2021framework,
+  title = {Transformer 回路的数学框架},
+  author = {Elhage, Nelson and Nanda, Neel and Olsson, Catherine and Henighan, Tom and Joseph, Nicholas and Mann, Ben and Askell, Amanda and Bai, Yuntao and Chen, Anna and Conerly, Tom and DasSarma, Nova and Drain, Dawn and Ganguli, Deep and Hatfield-Dodds, Zac and Hernandez, Danny and Jones, Andy and Kernion, Jackson and Lovitt, Liane and Ndousse, Kamal and Amodei, Dario and Brown, Tom and Clark, Jack and Kaplan, Jared and McCandlish, Sam and Olah, Chris},
+  journal = {Transformer 回路线程},
+  year = {2021},
+  url = {https://transformer-circuits.pub/2021/framework/index.html}
+}
+
+@inproceedings{wang2022ioi,
+  title = {野外可解释性：GPT-2 Small 中的间接对象识别电路},
+  author = {Wang, Kevin Ro and Variengien, Alexandre and Conmy, Arthur and Shlegeris, Buck and Steinhardt, Jacob},
+  booktitle = {国际学习表征会议 (ICLR)},
+  year = {2023},
+  url = {https://arxiv.org/abs/2211.00593}
+}
+
+@article{bricken2023monosemanticity,
+  title = {迈向单义性：通过字典学习分解语言模型},
+  author = {Bricken, Trenton and Templeton, Adly and Batson, Joshua and Chen, Brian and Jermyn, Adam and Conerly, Tom and Turner, Nick and Anil, Cem and Denison, Carson and Askell, Amanda and Lasenby, Robert and Wu, Yifan and Kravec, Shauna and Schiefer, Nicholas and Maxwell, Tim and Joseph, Nicholas and Hatfield-Dodds, Zac and Tamkin, Alex and Nguyen, Karina and McLean, Brayden and Burke, Josiah E and Hume, Tristan and Carter, Shan and Henighan, Tom and Olah, Christopher},
+  journal = {Transformer 回路线程},
+  year = {2023},
+  url = {https://transformer-circuits.pub/2023/monosemantic-features/index.html}
+}
+
+@article{cunningham2023sae,
+  title = {稀疏自动编码器在语言模型中找到高度可解释的特征},
+  author = {Cunningham, Hoagy and Ewart, Aidan and Riggs, Logan and Huben, Robert and Sharkey, Lee},
+  journal = {arXiv 预印本 arXiv:2309.08600},
+  year = {2023},
+  url = {https://arxiv.org/abs/2309.08600}
+}
+
+@article{ameisen2025circuit,
+  title = {电路追踪：揭示语言模型中的计算图},
+  author = {Ameisen, Emmanuel and Lindsey, Jack and Pearce, Adam and Gurnee, Wes and Turner, Nicholas L. and Chen, Brian and Citro, Craig and Abrahams, David and Carter, Shan and Hosmer, Basil and Marcus, Jonathan and Sklar, Michael and Templeton, Adly and Bricken, Trenton and McDougall, Callum and Cunningham, Hoagy and Henighan, Thomas and Jermyn, Adam and Jones, Andy and Persic, Andrew and Qi, Zhenyi and Ben Thompson, T. and Zimmerman, Sam and Rivoire, Kelley and Conerly, Thomas and Olah, Chris and Batson, Joshua},
+  journal = {Transformer 回路线程},
+  year = {2025},
+  url = {https://transformer-circuits.pub/2025/attribution-graphs/methods.html}
+}
+
+@article{weightwatcher,
+  title = {无需访问训练或测试数据即可预测最先进神经网络的质量趋势},
+  author = {Martin, Charles H. and Peng, Tongsu and Mahoney, Michael W.},
+  journal = {自然通讯},
+  volume = {12},
+  pages = {4122},
+  year = {2021},
+  url = {https://www.nature.com/articles/s41467-021-24025-8}
+}
+
+@inproceedings{meng2022rome,
+  title = {在 GPT 中查找和编辑事实关联},
+  author = {Meng, Kevin and Bau, David and Andonian, Alex and Belinkov, Yonatan},
+  booktitle = {神经信息处理系统 (NeurIPS) 的进展},
+  year = {2022},
+  url = {https://arxiv.org/abs/2202.05262}
+}
+
+@misc{bills2023explain,
+  title = {语言模型可以解释语言模型中的神经元},
+  author = {Bills, Steven and Cammarata, Nick and Mossing, Dan and Tillman, Henk and Gao, Leo and Goh, Gabriel and Sutskever, Ilya and Leike, Jan and Wu, Jeff and Saunders, William},
+  journal = {OpenAI},
+  year = {2023},
+  url = {https://openaipublic.blob.core.windows.net/neuron-explainer/paper/index.html}
+}
+
+@article{nla2026,
+  title = {自然语言自动编码器产生 LLM 激活的无监督解释},
+  author = {Fraser-Taliente, Kit and Kantamneni, Subhash and Ong, Euan and Mossing, Dan and Lu, Christina and Bogdan, Paul C. and Ameisen, Emmanuel and Chen, James and Kishylau, Dzmitry and Pearce, Adam and Tarng, Julius and Wu, Alex and Wu, Jeff and Zhang, Yang and Ziegler, Daniel M. and Hubinger, Evan and Batson, Joshua and Lindsey, Jack and Zimmerman, Samuel and Marks, Samuel},
+  journal = {Transformer 回路线程},
+  year = {2026},
+  url = {https://transformer-circuits.pub/2026/nla/index.html}
+}
+
+@article{karvonen2025activationoracles,
+  title = {激活预言机：培训和评估法学硕士作为通用激活解释者},
+  author = {Karvonen, Adam and Chua, James and Dumas, Clément and Fraser-Taliente, Kit and Kantamneni, Subhash and Minder, Julian and Ong, Euan and Sen Sharma, Arnab and Wen, Daniel and Evans, Owain and Marks, Samuel},
+  journal = {arXiv 预印本 arXiv:2512.15674},
+  year = {2025},
+  url = {https://arxiv.org/abs/2512.15674}
+}
+
+@article{weightoracles,
+  title = {权重预言：用语言模型读取神经网络权重},
+  author = {Kabra, Krishna and Venhoff, Constantin and Schroeder de Witt, Christian},
+  journal = {arXiv 预印本 arXiv:2610.07334},
+  year = {2026},
+  url = {https://arxiv.org/abs/2610.07334}
+}
+
+@article{goel2025dit,
+  title = {学习解释语言模型中的权重差异},
+  author = {Goel, Avichal and Kim, Yoon and Shavit, Nir and Wang, Tony T.},
+  journal = {arXiv 预印本 arXiv:2510.05092},
+  year = {2025},
+  url = {https://arxiv.org/abs/2510.05092}
+}
+
+@misc{neuronexplorer,
+  title = {Neuron-explorer：Qwen3.5-4B 的转向优先神经元探索器},
+  journal = {lyramakesmusic 的 GitHub 存储库},
+  year = {2026},
+  url = {https://github.com/lyramakesmusic/neuron-explorer}
+}
+
+@misc{workspacebench,
+  title = {WorkspaceBench：评估全局工作空间的可解释性方法},
+  author = {Blank, Camila and Bhatia, Agam and Ong, Euan and Nanda, Neel},
+  journal = {少错},
+  year = {2026},
+  url = {https://www.lesswrong.com/posts/Zeg2JztbdhguL48uH/workspacebench-evaluating-interpretability-methods-for-the}
+}
+
+@inproceedings{kingma2015adam,
+  title = {Adam：随机优化的方法},
+  author = {Kingma, Diederik P. and Ba, Jimmy},
+  booktitle = {国际学习表征会议 (ICLR)},
+  year = {2015},
+  url = {https://arxiv.org/abs/1412.6980}
+}
+
+@misc{jordan2024muon,
+  title = {Muon：神经网络中隐藏层的优化器},
+  author = {Jordan, Keller and Jin, Yuchen and Boza, Vlado and You, Jiacheng and Cesista, Franz and Newhouse, Laker and Bernstein, Jeremy},
+  journal = {博客文章},
+  year = {2024},
+  url = {https://kellerjordan.github.io/posts/muon/}
+}
+
+@inproceedings{yang2024opro,
+  title = {作为优化器的大型语言模型},
+  author = {Yang, Chengrun and Wang, Xuezhi and Lu, Yifeng and Liu, Hanxiao and Le, Quoc V. and Zhou, Denny and Chen, Xinyun},
+  booktitle = {国际学习表征会议 (ICLR)},
+  year = {2024},
+  url = {https://arxiv.org/abs/2309.03409}
+}
+
+@misc{karpathy2026autoresearch,
+  title = {自动研究},
+  author = {Karpathy, Andrej},
+  journal = {GitHub 存储库},
+  year = {2026},
+  url = {https://github.com/karpathy/autoresearch}
+}
+
+@misc{reactiveoptimizers,
+  title = {反应式优化器},
+  author = {Bai, Xingjian and Liang, Jia-Hao and Teoh, Jayden and Sitzmann, Vincent},
+  journal = {博客文章},
+  year = {2026},
+  url = {https://xingjianbai.com/reactive-optimizers/}
+}
+
+@article{khattab2022dsp,
+  title = {演示-搜索-预测：为知识密集型 NLP 构建检索和语言模型},
+  author = {Khattab, Omar and Santhanam, Keshav and Li, Xiang Lisa and Hall, David and Liang, Percy and Potts, Christopher and Zaharia, Matei},
+  journal = {arXiv 预印本 arXiv:2212.14024},
+  year = {2022},
+  url = {https://arxiv.org/abs/2212.14024}
+}
+
+@inproceedings{lee2026metaharness,
+  title = {Meta-Harness：模型运行框架的端到端优化},
+  author = {Lee, Yoonho and Nair, Roshen and Zhang, Qizheng and Lee, Kangwook and Khattab, Omar and Finn, Chelsea},
+  booktitle = {语言建模会议（COLM）},
+  year = {2026},
+  url = {https://arxiv.org/abs/2603.28052}
+}
+
+@inproceedings{khattab2023dspy,
+  title = {DSPy：将声明性语言模型调用编译到自我改进的管道中},
+  author = {Khattab, Omar and Singhvi, Arnav and Maheshwari, Paridhi and Zhang, Zhiyuan and Santhanam, Keshav and Vardhamanan, Sri and Haq, Saiful and Sharma, Ashutosh and Joshi, Thomas T. and Moazam, Hanna and Miller, Heather and Zaharia, Matei and Potts, Christopher},
+  booktitle = {国际学习表征会议 (ICLR)},
+  year = {2024},
+  url = {https://arxiv.org/abs/2310.03714}
+}
+
+@inproceedings{opsahlong2024mipro,
+  title = {优化多阶段语言模型程序的说明和演示},
+  author = {Opsahl-Ong, Krista and Ryan, Michael J. and Purtell, Josh and Broman, David and Potts, Christopher and Zaharia, Matei and Khattab, Omar},
+  booktitle = {自然语言处理经验方法会议（EMNLP）},
+  year = {2024},
+  url = {https://arxiv.org/abs/2406.11695}
+}
+
+@inproceedings{agrawal2025gepa,
+  title = {GEPA：反思性即时进化可以超越强化学习},
+  author = {Agrawal, Lakshya A. and Tan, Shangyin and Soylu, Dilara and Ziems, Noah and Khare, Rishi and Opsahl-Ong, Krista and Singhvi, Arnav and Shandilya, Herumb and Ryan, Michael J. and Jiang, Meng and Potts, Christopher and Sen, Koushik and Dimakis, Alexandros G. and Stoica, Ion and Klein, Dan and Zaharia, Matei and Khattab, Omar},
+  booktitle = {国际学习表征会议 (ICLR)},
+  year = {2026},
+  url = {https://arxiv.org/abs/2507.19457}
+}
+
+@article{peebles2022gpt,
+  title = {学习如何利用神经网络检查点的生成模型进行学习},
+  author = {Peebles, William and Radosavovic, Ilija and Brooks, Tim and Efros, Alexei A. and Malik, Jitendra},
+  journal = {arXiv 预印本 arXiv:2209.12892},
+  year = {2022},
+  url = {https://arxiv.org/abs/2209.12892}
+}
+
+@inproceedings{schurholt2022hyper,
+  title = {作为生成模型的超表示：对看不见的神经网络权重进行采样},
+  author = {Schürholt, Konstantin and Knyazev, Boris and Giró-i-Nieto, Xavier and Borth, Damian},
+  booktitle = {神经信息处理系统 (NeurIPS) 的进展},
+  year = {2022},
+  url = {https://arxiv.org/abs/2209.14733}
+}
+
+@article{wang2024pdiff,
+  title = {神经网络扩散},
+  author = {Wang, Kai and Tang, Dongwen and Zeng, Boya and Yin, Yida and Xu, Zhaopan and Zhou, Yukun and Zang, Zelin and Darrell, Trevor and Liu, Zhuang and You, Yang},
+  journal = {arXiv 预印本 arXiv:2402.13144},
+  year = {2024},
+  url = {https://arxiv.org/abs/2402.13144}
+}
+
+@inproceedings{phang2023hypertuning,
+  title = {HyperTuning：在没有反向传播的情况下适应大型语言模型},
+  author = {Phang, Jason and Mao, Yi and He, Pengcheng and Chen, Weizhu},
+  booktitle = {国际机器学习会议（ICML）},
+  year = {2023},
+  url = {https://proceedings.mlr.press/v202/phang23a.html}
+}
+
+@inproceedings{navon2023equivariant,
+  title = {深度权重空间学习的等变架构},
+  author = {Navon, Aviv and Shamsian, Aviv and Achituve, Idan and Fetaya, Ethan and Chechik, Gal and Maron, Haggai},
+  booktitle = {国际机器学习会议（ICML）},
+  year = {2023},
+  url = {https://proceedings.mlr.press/v202/navon23a.html}
+}
+
+@article{neurogen2025,
+  title = {NeuroGen：通过大型语言模型生成神经网络参数},
+  author = {Wang, Jiaqi and Zhang, Yusen and Li, Xi},
+  journal = {arXiv 预印本 arXiv:2505.12470},
+  year = {2025},
+  url = {https://arxiv.org/abs/2505.12470}
+}
+
+@misc{adderboard,
+  title = {AdderBoard：微型算术 Transformer的社区挑战},
+  author = {Papailiopoulos, Dimitris},
+  journal = {GitHub 存储库},
+  year = {2026},
+  url = {https://github.com/anadim/AdderBoard}
+}
+
+@article{spall1992spsa,
+  title = {使用同时扰动梯度近似的多元随机近似},
+  author = {Spall, James C.},
+  journal = {IEEE 自动控制汇刊},
+  volume = {37},
+  number = {3},
+  pages = {332--341},
+  year = {1992},
+  url = {https://doi.org/10.1109/9.119632}
+}
+
+@article{salimans2017es,
+  title = {进化策略作为强化学习的可扩展替代方案},
+  author = {Salimans, Tim and Ho, Jonathan and Chen, Xi and Sidor, Szymon and Sutskever, Ilya},
+  journal = {arXiv 预印本 arXiv:1703.03864},
+  year = {2017},
+  url = {https://arxiv.org/abs/1703.03864}
+}
+
+@inproceedings{malladi2023mezo,
+  title = {仅通过前向传播来微调语言模型},
+  author = {Malladi, Sadhika and Gao, Tianyu and Nichani, Eshaan and Damian, Alex and Lee, Jason D. and Chen, Danqi and Arora, Sanjeev},
+  booktitle = {神经信息处理系统 (NeurIPS) 的进展},
+  year = {2023},
+  url = {https://arxiv.org/abs/2305.17333}
+}
+
+@inproceedings{qiu2026esllm,
+  title = {大规模进化策略：法学硕士微调超越强化学习},
+  author = {Qiu, Xin and Gan, Yulu and Hayes, Conor F. and Liang, Qiyao and Xu, Yinggan and Dailey, Roberto and Meyerson, Elliot and Hodjat, Babak and Miikkulainen, Risto},
+  booktitle = {国际机器学习会议（ICML）},
+  year = {2026},
+  url = {https://arxiv.org/abs/2509.24372}
+}
+@misc{globis2023aozorabunko,
+  title = {aozorabunko-clean：青空文库的日本文学作品集，经过清理和重复数据删除},
+  journal = {Hugging Face 数据集，GLOBIS 大学},
+  year = {2023},
+  url = {https://huggingface.co/datasets/globis-university/aozorabunko-clean}
+}
+
+@misc{wikimedia2023wikipedia,
+  title = {维基百科，英语，2023 年 11 月 1 日转储},
+  journal = {Hugging Face 数据集维基媒体/维基百科，维基媒体基金会},
+  year = {2023},
+  url = {https://huggingface.co/datasets/wikimedia/wikipedia}
+}
+@article{pipis2025loop,
+  title = {等等，等等，等等......为什么推理模型会循环？},
+  author = {Pipis, Charilaos and Garg, Shivam and Kontonis, Vasilis and Shrivastava, Vaishnavi and Krishnamurthy, Akshay and Papailiopoulos, Dimitris},
+  journal = {arXiv 预印本 arXiv:2512.12895},
+  year = {2025},
+  url = {https://arxiv.org/abs/2512.12895}
+}
+
+@article{arditi2024refusal,
+  title = {语言模型中的拒绝是由单一方向介导的},
+  author = {Arditi, Andy and Obeso, Oscar and Syed, Aaquib and Paleka, Daniel and Panickssery, Nina and Gurnee, Wes and Nanda, Neel},
+  journal = {arXiv 预印本 arXiv:2406.11717},
+  year = {2024},
+  url = {https://arxiv.org/abs/2406.11717}
+}
+</script>
+</d-bibliography>
+<script>document.querySelectorAll('.post-cite__box button').forEach(button => button.addEventListener('click',async()=>{ const text=button.parentElement.querySelector('pre').textContent; try { await navigator.clipboard.writeText(text);button.textContent='已复制';setTimeout(()=>button.textContent='复制',1500); } catch {getSelection().selectAllChildren(button.parentElement.querySelector('pre'));button.textContent='请按 Ctrl+C';} }));</script></body>
+</html>

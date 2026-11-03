@@ -1,0 +1,59 @@
+name: 检查并部署中文博客
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: 静态资源与脚本检查
+    runs-on: ubuntu-latest
+    steps:
+      - name: 获取源码
+        uses: actions/checkout@v4
+      - name: 检查资源与实验数据
+        run: python3 scripts/check.py
+      - name: 检查交互脚本语法
+        run: |
+          for file in js/*.js; do
+            node --check "$file"
+          done
+      - name: 生成发布目录
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir _site
+          cp index.html .nojekyll LICENSE THIRD_PARTY_NOTICES.md _site/
+          cp -R assets css js vendor _site/
+      - name: 保存页面产物
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    name: 部署 GitHub Pages
+    if: github.event_name != 'pull_request'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 配置 Pages
+        uses: actions/configure-pages@v5
+      - name: 发布站点
+        id: deployment
+        uses: actions/deploy-pages@v5
